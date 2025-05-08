@@ -1,25 +1,29 @@
 <?php
 session_start();
+
+// Debug session
+error_log("Session data: " . print_r($_SESSION, true));
+
 if (isset($_SESSION['user_id'])) {
-    header("Location: home.php");
+    error_log("User ID in session: " . $_SESSION['user_id']);
+    error_log("User type in session: " . ($_SESSION['user_type'] ?? 'not set'));
+    
+    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin') {
+        error_log("Redirecting to admin dashboard");
+        header("Location: admin_dashboard.php");
+    } else {
+        error_log("Redirecting to home page");
+        header("Location: home.php");
+    }
     exit();
 }
 
-// Demo user (replace with database in production)
-$users = [
-    'user@example.com' => [
-        'password' => 'password123',
-        'id' => 1,
-        'name' => 'Demo User'
-    ]
-];
+require_once 'db_connect.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['register'])) {
         // Handle registration
         $first_name = $_POST['first_name'] ?? '';
-        $last_name = $_POST['last_name'] ?? '';
-        $gender = $_POST['gender'] ?? '';
         $email = $_POST['email'] ?? '';
         $password = $_POST['password'] ?? '';
         $confirm_password = $_POST['confirm_password'] ?? '';
@@ -27,21 +31,55 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($password !== $confirm_password) {
             $error = "Passwords don't match";
         } else {
-            // In a real app, you would save to database here
-            $success = "Registration successful! Please login.";
+            // Store password as plain text
+            try {
+                $stmt = $pdo->prepare("INSERT INTO users (first_name, email, password, user_type) VALUES (?, ?, ?, 'customer')");
+                $stmt->execute([$first_name, $email, $password]);
+                $success = "Registration successful! Please login.";
+            } catch(PDOException $e) {
+                if ($e->getCode() == 23000) { // Duplicate entry error
+                    $error = "Email already exists";
+                } else {
+                    $error = "Registration failed. Please try again.";
+                }
+            }
         }
     } else {
-        // Handle login
+        // Handle login with plain text password
         $email = $_POST['email'] ?? '';
         $password = $_POST['password'] ?? '';
+        $user_type = $_POST['user_type'] ?? 'customer';
         
-        if (isset($users[$email]) && $users[$email]['password'] === $password) {
-            $_SESSION['user_id'] = $users[$email]['id'];
-            $_SESSION['user_name'] = $users[$email]['name'];
-            header("Location: home.php");
-            exit();
-        } else {
-            $error = "Invalid email or password";
+        error_log("Login attempt - Email: $email, Selected type: $user_type");
+        
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND password = ?");
+            $stmt->execute([$email, $password]);
+            
+            if ($stmt->rowCount() == 1) {
+                $user = $stmt->fetch();
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_name'] = $user['first_name'];
+                $_SESSION['user_type'] = $user_type;
+                
+                error_log("Session set - User ID: " . $_SESSION['user_id']);
+                error_log("Session set - User type: " . $_SESSION['user_type']);
+                
+                if ($user_type === 'admin') {
+                    error_log("Redirecting to admin dashboard");
+                    header("Location: admin_dashboard.php");
+                } else {
+                    error_log("Redirecting to home page");
+                    header("Location: home.php");
+                }
+                exit();
+            } else {
+                error_log("Invalid login attempt for email: $email");
+                $error = "Invalid email or password";
+            }
+        } catch(PDOException $e) {
+            error_log("Login error: " . $e->getMessage());
+            $error = "Login failed. Please try again.";
         }
     }
 }
@@ -52,7 +90,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login System</title>
+    <title>Login - Support Ticket System</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="STStr.svg">
+    <link rel="icon" type="image/png" href="STStr.png">
+    <link rel="apple-touch-icon" href="STStr.png">
     <style>
         * {
             margin: 0;
@@ -62,11 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         
         body {
+            background-color: #f5f7fa;
+            margin: 0;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            background-color: #f5f7fa;
+            font-family: Arial, sans-serif;
+            position: relative;
+            overflow: hidden;
         }
         
         .container {
@@ -78,11 +124,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             justify-content: center;
             position: relative;
             overflow: hidden;
-            background-color: #ffffff25;
-            border-radius: 15px;
-            box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.03);
-            border: 0.1px solid rgba(128, 128, 128, 0.178);
-            transition: height 0.5s ease;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1;
         }
         
         .left {
@@ -101,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             left: 0;
             backdrop-filter: blur(20px);
             position: relative;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .register-form {
@@ -109,17 +154,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             left: 0;
             width: 100%;
             height: 100%;
-            transform: translateX(100%);
-            transition: transform 0.5s ease;
+            transform: translateX(100%) scale(0.98);
+            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
             padding-top: 20px;
+            opacity: 0;
+            visibility: hidden;
         }
         
         .show-register .register-form {
-            transform: translateX(0);
+            transform: translateX(0) scale(1);
+            opacity: 1;
+            visibility: visible;
         }
         
         .show-register .login-form {
-            transform: translateX(-100%);
+            transform: translateX(-100%) scale(0.98);
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .login-form {
+            opacity: 1;
+            visibility: visible;
+            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .form::before {
@@ -179,9 +236,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 1.1em;
         }
         
-        .input-block {
-            position: relative;
+        .form .input-block {
+            opacity: 0;
+            transform: translateY(30px) scale(0.98);
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        
+        .form.active .input-block {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        
+        .input-block:nth-child(1) { transition-delay: 0.1s; }
+        .input-block:nth-child(2) { transition-delay: 0.2s; }
+        .input-block:nth-child(3) { transition-delay: 0.3s; }
+        .input-block:nth-child(4) { transition-delay: 0.4s; }
+        .input-block:nth-child(5) { transition-delay: 0.5s; }
+        .input-block:nth-child(6) { transition-delay: 0.6s; }
         
         label {
             position: absolute;
@@ -213,6 +284,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: medium;
             box-shadow: 2px 4px 8px rgba(70, 70, 70, 0.178);
             cursor: pointer;
+            transition: background 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+        }
+        
+        button:hover, button:focus {
+            background-color: #447cf5;
+            transform: translateY(-2px) scale(1.04);
+            box-shadow: 0 8px 20px rgba(94, 126, 182, 0.25);
+            outline: none;
         }
         
         a {
@@ -223,6 +302,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .input {
             box-shadow: inset 4px 4px 4px rgba(165, 163, 163, 0.315),
                 4px 4px 4px rgba(218, 218, 218, 0.13);
+        }
+        
+        .switch-form {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9em;
         }
         
         .error {
@@ -239,33 +324,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin-top: 10px;
         }
         
-        .switch-form {
-            text-align: center;
-            margin-top: 15px;
-            font-size: 0.9em;
+        .user-type-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 10px auto;
+            width: 80%;
         }
         
-        .show-register .container {
-            height: 650px;
+        .user-type-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .user-type-option input[type="radio"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .user-type-option label {
+            position: static;
+            transform: none;
+            pointer-events: auto;
+            color: #425981;
         }
     </style>
 </head>
 <body>
-    <div class="container <?php echo isset($_POST['register']) ? 'show-register' : ''; ?>">
+    <div class="container <?php echo (isset($_POST['register']) || isset($error)) ? 'show-register' : ''; ?>">
         <div class="left">
             <!-- Login Form -->
-            <form class="form login-form" method="POST">
+            <form class="form login-form <?php echo (!isset($_POST['register']) && !isset($error)) ? 'active' : ''; ?>" method="POST">
                 <div class="input-block">
-                    <input class="input" type="email" id="email" name="email" required>
-                    <label for="email">Email</label>
+                    <input class="input" type="email" id="login-email" name="email" required>
+                    <label for="login-email">Email</label>
                 </div>
                 <div class="input-block">
-                    <input class="input" type="password" id="password" name="password" required>
-                    <label for="password">Password</label>
+                    <input class="input" type="password" id="login-password" name="password" required>
+                    <label for="login-password">Password</label>
                 </div>
                 <div class="input-block">
                     <span class="forgot"><a href="#">Forgot Password?</a></span>
                     <button type="submit">Login</button>
+                    <div class="user-type-container">
+                        <div class="user-type-option">
+                            <input type="radio" id="customer" name="user_type" value="customer" checked>
+                            <label for="customer">Customer</label>
+                        </div>
+                        <div class="user-type-option">
+                            <input type="radio" id="admin" name="user_type" value="admin">
+                            <label for="admin">Admin</label>
+                        </div>
+                    </div>
                     <p class="switch-form">Don't have an account? <a href="#" class="switch-btn">Register</a></p>
                 </div>
                 <?php if (isset($error) && !isset($_POST['register'])): ?>
@@ -277,26 +388,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </form>
 
             <!-- Register Form -->
-            <form class="form register-form" method="POST">
+            <form class="form register-form <?php echo (isset($_POST['register']) || isset($error)) ? 'active' : ''; ?>" method="POST">
                 <input type="hidden" name="register" value="1">
                 <div class="input-block">
-                    <input class="input" type="text" id="first_name" name="first_name" required>
+                    <input class="input" type="text" id="first_name" name="first_name" required value="<?php echo htmlspecialchars($_POST['first_name'] ?? ''); ?>">
                     <label for="first_name">First Name</label>
                 </div>
                 <div class="input-block">
-                    <input class="input" type="text" id="last_name" name="last_name" required>
-                    <label for="last_name">Last Name</label>
-                </div>
-                <div class="input-block">
-                    <select class="input" id="gender" name="gender" required>
-                        <option value=""></option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                    </select>
-                    <label for="gender">Gender</label>
-                </div>
-                <div class="input-block">
-                    <input class="input" type="email" id="email" name="email" required>
+                    <input class="input" type="email" id="email" name="email" required value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
                     <label for="email">Email</label>
                 </div>
                 <div class="input-block">
@@ -313,6 +412,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <?php if (isset($error) && isset($_POST['register'])): ?>
                     <p class="error"><?php echo $error; ?></p>
+                <?php endif; ?>
+                <?php if (isset($success)): ?>
+                    <p class="success"><?php echo $success; ?></p>
                 <?php endif; ?>
             </form>
         </div>
@@ -367,24 +469,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.addEventListener('DOMContentLoaded', function() {
             const container = document.querySelector('.container');
             const switchBtns = document.querySelectorAll('.switch-btn');
+            const loginForm = document.querySelector('.login-form');
+            const registerForm = document.querySelector('.register-form');
+            
+            function activateForm(form) {
+                form.classList.add('active');
+                const inputs = form.querySelectorAll('.input-block');
+                inputs.forEach((input, index) => {
+                    setTimeout(() => {
+                        input.style.opacity = '1';
+                        input.style.transform = 'translateY(0)';
+                    }, 100 * index);
+                });
+            }
+
+            function deactivateForm(form) {
+                form.classList.remove('active');
+                const inputs = form.querySelectorAll('.input-block');
+                inputs.forEach(input => {
+                    input.style.opacity = '0';
+                    input.style.transform = 'translateY(20px)';
+                });
+            }
             
             switchBtns.forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.preventDefault();
                     container.classList.toggle('show-register');
-                });
-            });
-            
-            // Focus first input when form is shown
-            const forms = document.querySelectorAll('.form');
-            forms.forEach(form => {
-                form.addEventListener('transitionend', function() {
-                    if (form.style.transform === 'translateX(0px)') {
-                        const input = form.querySelector('input');
-                        if (input) input.focus();
+                    
+                    if (container.classList.contains('show-register')) {
+                        deactivateForm(loginForm);
+                        setTimeout(() => activateForm(registerForm), 300);
+                    } else {
+                        deactivateForm(registerForm);
+                        setTimeout(() => activateForm(loginForm), 300);
                     }
                 });
             });
+            
+            // Activate initial form based on PHP condition
+            if (container.classList.contains('show-register')) {
+                activateForm(registerForm);
+            } else {
+                activateForm(loginForm);
+            }
         });
     </script>
 </body>
