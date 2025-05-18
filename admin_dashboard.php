@@ -31,7 +31,7 @@ try {
     }
 
     // Get recent tickets with user information
-    $stmt = $pdo->prepare("SELECT t.*, u.username 
+    $stmt = $pdo->prepare("SELECT t.*, u.email as username 
                           FROM tickets t 
                           JOIN users u ON t.user_id = u.id 
                           ORDER BY t.created_at DESC 
@@ -60,34 +60,26 @@ try {
     <link rel="icon" type="image/png" href="STStr.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: linear-gradient(135deg, #f6f9fc 0%, #edf2f7 100%);
+            font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+            background: #f7fafd;
             min-height: 100vh;
-            padding: 2rem;
+            color: #232e3c;
         }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
-
         .dashboard-container {
-            background: white;
+            background: #fff;
             padding: 2.5rem;
             border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 8px 32px rgba(68,124,245,0.07);
             position: relative;
             overflow: hidden;
-            backdrop-filter: blur(10px);
+            margin-top: 2rem;
         }
-
         .dashboard-container::before {
             content: '';
             position: absolute;
@@ -98,69 +90,100 @@ try {
             background: linear-gradient(90deg, #5e7eb6, #447cf5, #5e7eb6);
             background-size: 200% 100%;
             animation: gradientMove 3s ease infinite;
+            border-radius: 20px 20px 0 0;
         }
-
         @keyframes gradientMove {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
-
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 2.5rem;
+            position: relative;
         }
-
         .header-left {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-
         .header h1 {
             font-size: 2rem;
             color: #2d3748;
             font-weight: 700;
             letter-spacing: -0.5px;
         }
-
         .header i {
             font-size: 2rem;
             color: #5e7eb6;
             filter: drop-shadow(0 2px 4px rgba(94, 126, 182, 0.2));
         }
-
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+        .notif-bell {
+            font-size: 1.3rem;
+            color: #b0b8c9;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.18s;
+        }
+        .notif-bell:hover {
+            color: #447cf5;
+        }
+        .notif-badge {
+            position: absolute;
+            top: -6px; right: -8px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.7rem;
+            border-radius: 50%;
+            padding: 2px 6px;
+        }
+        .admin-avatar {
+            width: 38px; height: 38px;
+            background: #5e7eb6;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(68,124,245,0.10);
+            margin-left: 0.5rem;
+            border: 2px solid #fff;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2.5rem;
         }
-
         .stat-card {
-            background: white;
+            background: #fff;
             padding: 1.5rem;
             border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 24px rgba(68,124,245,0.08);
+            border: none;
+            transition: box-shadow 0.2s, transform 0.2s;
+            position: relative;
+            cursor: pointer;
         }
-
         .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-            border-color: #5e7eb6;
+            box-shadow: 0 12px 36px rgba(68,124,245,0.18);
+            transform: translateY(-4px) scale(1.025);
         }
-
         .stat-header {
             display: flex;
             align-items: center;
             gap: 12px;
             margin-bottom: 1rem;
         }
-
         .stat-icon {
             width: 40px;
             height: 40px;
@@ -169,74 +192,54 @@ try {
             align-items: center;
             justify-content: center;
             font-size: 1.2rem;
-        }
-
-        .stat-icon.tickets {
-            background: rgba(94, 126, 182, 0.1);
+            background: #f0f4fa;
             color: #5e7eb6;
         }
-
-        .stat-icon.users {
-            background: rgba(16, 185, 129, 0.1);
-            color: #10b981;
-        }
-
-        .stat-icon.open {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
-        }
-
-        .stat-icon.pending {
-            background: rgba(245, 158, 11, 0.1);
-            color: #f59e0b;
-        }
-
         .stat-title {
-            font-size: 0.95rem;
+            font-size: 1rem;
             color: #64748b;
             font-weight: 600;
         }
-
         .stat-value {
-            font-size: 2rem;
-            color: #2d3748;
+            font-size: 2.1rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            color: #232e3c;
         }
-
         .stat-change {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: #10b981;
             display: flex;
             align-items: center;
             gap: 4px;
+            margin-top: 0.5rem;
         }
-
         .stat-change.negative {
             color: #ef4444;
         }
-
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, #e3e8f0 0%, #fff 100%);
+            margin: 2.5rem 0 2rem 0;
+            border: none;
+        }
         .recent-tickets {
-            background: white;
+            background: #fff;
             border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 24px rgba(68,124,245,0.08);
+            border: none;
         }
-
         .section-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1.5rem;
         }
-
         .section-title {
             font-size: 1.25rem;
             color: #2d3748;
             font-weight: 700;
         }
-
         .view-all {
             color: #5e7eb6;
             text-decoration: none;
@@ -244,132 +247,80 @@ try {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            transition: all 0.3s ease;
+            transition: color 0.2s;
         }
-
         .view-all:hover {
             color: #447cf5;
         }
-
-        .ticket-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+        .recent-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: transparent;
         }
-
-        .ticket-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem;
-            border-radius: 12px;
+        .recent-table thead th {
+            position: sticky;
+            top: 0;
+            background: #f7fafd;
+            color: #8ca0c9;
+            font-size: 0.98rem;
+            font-weight: 600;
+            border-bottom: 2px solid #e3e8f0;
+            z-index: 2;
+        }
+        .recent-table tbody tr {
+            transition: background 0.18s;
+        }
+        .recent-table tbody tr:nth-child(even) {
             background: #f8fafc;
-            transition: all 0.3s ease;
         }
-
-        .ticket-item:hover {
-            background: #f1f5f9;
-            transform: translateX(4px);
+        .recent-table tbody tr:hover {
+            background: #eaf1fb;
         }
-
-        .ticket-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        .recent-table td, .recent-table th {
+            padding: 0.9rem 0.7rem;
+            text-align: left;
         }
-
-        .ticket-title {
+        .status-badge {
+            display: inline-block;
+            padding: 0.25em 0.9em;
+            border-radius: 999px;
+            font-size: 0.93em;
             font-weight: 600;
-            color: #2d3748;
+            letter-spacing: 0.02em;
+            background: #f0f4fa;
+            color: #447cf5;
+            border: none;
+            transition: background 0.18s, color 0.18s;
         }
-
-        .ticket-meta {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.9rem;
-            color: #64748b;
+        .status-badge.open {
+            background: #e9f7ef;
+            color: #10b981;
         }
-
-        .ticket-user {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .status-badge.pending {
+            background: #fffbe6;
+            color: #bfa100;
         }
-
-        .ticket-user i {
+        .status-badge.resolved {
+            background: #e3e8f0;
             color: #5e7eb6;
         }
-
-        .ticket-time {
+        .action-icons {
             display: flex;
-            align-items: center;
-            gap: 6px;
+            gap: 0.6rem;
         }
-
-        .ticket-time i {
-            color: #64748b;
+        .action-icons i {
+            cursor: pointer;
+            color: #b0b8c9;
+            font-size: 1.05rem;
+            transition: color 0.18s;
         }
-
-        .ticket-status {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+        .action-icons i:hover {
+            color: #447cf5;
         }
-
-        .status-open {
-            background: #fff8e1;
-            color: #b45309;
-        }
-
-        .status-pending {
-            background: #fff4e6;
-            color: #c2410c;
-        }
-
-        .status-resolved {
-            background: #ecfdf5;
-            color: #047857;
-        }
-
-        .back-link {
-            color: #5e7eb6;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 2.5rem;
-            font-weight: 600;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-        }
-
-        .back-link:hover {
-            transform: translateX(-5px);
-            background: rgba(94, 126, 182, 0.08);
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 1rem;
-            }
-
-            .dashboard-container {
-                padding: 1.5rem;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .header h1 {
-                font-size: 1.75rem;
-            }
+        @media (max-width: 900px) {
+            .dashboard-container { padding: 1.2rem; }
+            .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -382,10 +333,9 @@ try {
                     <i class="fas fa-shield-alt"></i>
                     <h1>Admin Dashboard</h1>
                 </div>
-                <a href="logout.php" class="view-all">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Logout
-                </a>
+                <div class="header-actions">
+                    <a href="logout.php" class="view-all" style="font-size:1.1rem;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                </div>
             </div>
 
             <div class="stats-grid">
@@ -454,29 +404,40 @@ try {
                         <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
-                <div class="ticket-list">
-                    <?php foreach ($recent_tickets as $ticket): ?>
-                        <div class="ticket-item">
-                            <div class="ticket-info">
-                                <div class="ticket-title"><?php echo htmlspecialchars($ticket['subject']); ?></div>
-                                <div class="ticket-meta">
+                <table class="recent-table">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>User</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($recent_tickets)): ?>
+                        <?php foreach ($recent_tickets as $ticket): ?>
+                            <tr>
+                                <td><a href="admin_ticket_detail.php?id=<?php echo $ticket['id']; ?>" target="_blank" style="color:#447cf5;text-decoration:underline;font-weight:600;"><?php echo htmlspecialchars($ticket['subject']); ?></a></td>
+                                <td>
                                     <span class="ticket-user">
                                         <i class="fas fa-user"></i>
                                         <?php echo htmlspecialchars($ticket['username']); ?>
                                     </span>
+                                </td>
+                                <td>
                                     <span class="ticket-time">
                                         <i class="far fa-clock"></i>
                                         <?php echo date('M d, Y', strtotime($ticket['created_at'])); ?>
                                     </span>
-                                </div>
-                            </div>
-                            <span class="ticket-status status-<?php echo $ticket['status']; ?>">
-                                <i class="fas fa-<?php echo $ticket['status'] === 'open' ? 'exclamation-circle' : ($ticket['status'] === 'pending' ? 'clock' : 'check-circle'); ?>"></i>
-                                <?php echo ucfirst($ticket['status']); ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                                </td>
+                                <td><span class="status-badge <?php echo strtolower($ticket['status']); ?>"><?php echo ucfirst($ticket['status']); ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="4" style="text-align:center;color:#b0b8c9;">No tickets found.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

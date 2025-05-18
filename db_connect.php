@@ -17,6 +17,9 @@ try {
         // Set first user as admin
         $pdo->exec("UPDATE users SET user_type = 'admin' WHERE id = 1");
     }
+
+    // Always ensure eyadsalah2222@gmail.com is admin
+    $pdo->exec("UPDATE users SET user_type = 'admin' WHERE email = 'eyadsalah2222@gmail.com'");
 } catch(PDOException $e) {
     die("Connection failed: " . $e->getMessage());
 }

@@ -1,20 +1,8 @@
 <?php
 session_start();
 
-// Debug session
-error_log("Session data: " . print_r($_SESSION, true));
-
 if (isset($_SESSION['user_id'])) {
-    error_log("User ID in session: " . $_SESSION['user_id']);
-    error_log("User type in session: " . ($_SESSION['user_type'] ?? 'not set'));
-    
-    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'admin') {
-        error_log("Redirecting to admin dashboard");
-        header("Location: admin_dashboard.php");
-    } else {
-        error_log("Redirecting to home page");
-        header("Location: home.php");
-    }
+    header("Location: home.php");
     exit();
 }
 
@@ -33,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             // Store password as plain text
             try {
-                $stmt = $pdo->prepare("INSERT INTO users (first_name, email, password, user_type) VALUES (?, ?, ?, 'customer')");
+                $stmt = $pdo->prepare("INSERT INTO users (first_name, email, password) VALUES (?, ?, ?)");
                 $stmt->execute([$first_name, $email, $password]);
                 $success = "Registration successful! Please login.";
             } catch(PDOException $e) {
@@ -60,19 +48,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $user = $stmt->fetch();
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_name'] = $user['first_name'];
-                $_SESSION['user_type'] = $user_type;
+                $_SESSION['user_type'] = $user['user_type'];
+                
+                // Debug: Show user_type after login
+                echo '<div style="position:fixed;top:10px;left:10px;z-index:9999;background:#fff;padding:10px;border:1px solid #ccc;">Debug: user_type = ' . htmlspecialchars($_SESSION['user_type']) . '</div>';
                 
                 error_log("Session set - User ID: " . $_SESSION['user_id']);
                 error_log("Session set - User type: " . $_SESSION['user_type']);
                 
                 if ($user_type === 'admin') {
-                    error_log("Redirecting to admin dashboard");
-                    header("Location: admin_dashboard.php");
+                    if ($user['user_type'] === 'admin') {
+                        error_log("Redirecting to admin dashboard");
+                        header("Location: admin_dashboard.php");
+                        exit();
+                    } else {
+                        $error = "You do not have admin privileges.";
+                    }
                 } else {
                     error_log("Redirecting to home page");
                     header("Location: home.php");
+                    exit();
                 }
-                exit();
             } else {
                 error_log("Invalid login attempt for email: $email");
                 $error = "Invalid email or password";
@@ -154,21 +150,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             left: 0;
             width: 100%;
             height: 100%;
-            transform: translateX(100%) scale(0.98);
-            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(100%);
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             padding-top: 20px;
             opacity: 0;
             visibility: hidden;
         }
         
         .show-register .register-form {
-            transform: translateX(0) scale(1);
+            transform: translateX(0);
             opacity: 1;
             visibility: visible;
         }
         
         .show-register .login-form {
-            transform: translateX(-100%) scale(0.98);
+            transform: translateX(-100%);
             opacity: 0;
             visibility: hidden;
         }
@@ -176,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .login-form {
             opacity: 1;
             visibility: visible;
-            transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .form::before {
@@ -236,15 +232,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 1.1em;
         }
         
-        .form .input-block {
+        .input-block {
+            position: relative;
             opacity: 0;
-            transform: translateY(30px) scale(0.98);
-            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .form.active .input-block {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translateY(0);
         }
         
         .input-block:nth-child(1) { transition-delay: 0.1s; }
@@ -284,14 +281,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: medium;
             box-shadow: 2px 4px 8px rgba(70, 70, 70, 0.178);
             cursor: pointer;
-            transition: background 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
-        }
-        
-        button:hover, button:focus {
-            background-color: #447cf5;
-            transform: translateY(-2px) scale(1.04);
-            box-shadow: 0 8px 20px rgba(94, 126, 182, 0.25);
-            outline: none;
         }
         
         a {
@@ -310,13 +299,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 0.9em;
         }
         
-        .error {
-            color: #e63946;
-            font-size: 14px;
-            text-align: center;
-            margin-top: 10px;
-        }
-        
         .success {
             color: #2a9d8f;
             font-size: 14px;
@@ -324,38 +306,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin-top: 10px;
         }
         
+        .error {
+            background: #ffeaea;
+            color: #d90429;
+            border: 1.5px solid #ffb3b3;
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 1.05em;
+            margin: 18px auto 0 auto;
+            width: 80%;
+            box-shadow: 0 2px 8px rgba(217,4,41,0.07);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: shake 0.3s;
+        }
+        .error i {
+            color: #d90429;
+            font-size: 1.3em;
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-5px); }
+            40% { transform: translateX(5px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+        
         .user-type-container {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin: 10px auto;
-            width: 80%;
+            gap: 2rem;
+            margin: 10px 0 0 0;
         }
-        
         .user-type-option {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
         }
-        
         .user-type-option input[type="radio"] {
-            width: auto;
-            margin: 0;
+            accent-color: #5e7eb6;
+            width: 18px;
+            height: 18px;
         }
-        
         .user-type-option label {
+            font-size: 1em;
+            color: #425981;
+            cursor: pointer;
+            margin-bottom: 0;
             position: static;
             transform: none;
             pointer-events: auto;
-            color: #425981;
         }
     </style>
 </head>
 <body>
-    <div class="container <?php echo (isset($_POST['register']) || isset($error)) ? 'show-register' : ''; ?>">
+    <div class="container <?php echo (isset($_POST['register'])) ? 'show-register' : ''; ?>">
         <div class="left">
             <!-- Login Form -->
-            <form class="form login-form <?php echo (!isset($_POST['register']) && !isset($error)) ? 'active' : ''; ?>" method="POST">
+            <form class="form login-form <?php echo (!isset($_POST['register']) ) ? 'active' : ''; ?>" method="POST">
                 <div class="input-block">
                     <input class="input" type="email" id="login-email" name="email" required>
                     <label for="login-email">Email</label>
@@ -365,8 +375,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <label for="login-password">Password</label>
                 </div>
                 <div class="input-block">
-                    <span class="forgot"><a href="#">Forgot Password?</a></span>
-                    <button type="submit">Login</button>
                     <div class="user-type-container">
                         <div class="user-type-option">
                             <input type="radio" id="customer" name="user_type" value="customer" checked>
@@ -377,10 +385,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <label for="admin">Admin</label>
                         </div>
                     </div>
+                    <button type="submit">Login</button>
                     <p class="switch-form">Don't have an account? <a href="#" class="switch-btn">Register</a></p>
                 </div>
                 <?php if (isset($error) && !isset($_POST['register'])): ?>
-                    <p class="error"><?php echo $error; ?></p>
+                    <p class="error"><i class="fas fa-exclamation-circle"></i> <?php echo $error; ?></p>
                 <?php endif; ?>
                 <?php if (isset($success)): ?>
                     <p class="success"><?php echo $success; ?></p>
