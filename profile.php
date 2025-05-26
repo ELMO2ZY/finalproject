@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             padding: 0 2rem;
             z-index: 1000;
         }
@@ -290,9 +290,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <!-- Top Bar -->
     <div class="top-bar">
-        <div class="logo">
-            <img src="STStr.svg" alt="Logo" height="40">
-        </div>
         <div class="user-profile" id="userProfile">
             <div class="user-circle">
                 <?php echo strtoupper(substr($_SESSION['user_name'], 0, 1)); ?>
